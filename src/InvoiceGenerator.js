@@ -1,78 +1,101 @@
 import React, { useState } from "react";
 import jsPDF from "jspdf";
-import { saveAs } from "file-saver";
 
 export default function InvoiceGenerator() {
   const [invoiceData, setInvoiceData] = useState({
-    clientName: "",
-    service: "",
+    invoiceNumber: generateInvoiceNumber(),
+    date: getCurrentDate(),
+    buyerName: "",
+    buyerAddress: "",
+    buyerGST: "",
+    panNumber: "",
+    lotNumber: "",
+    hsnCode: "71023910",
+    quantity: "",
+    size: "N/A",
+    rate: "",
     amount: "",
-    taxRate: "",
-    terms: "",
-    fontSize: "16", // Default font size
-    alignment: "left", // Default text alignment
+    cgstRate: "0",
+    sgstRate: "0",
+    igstRate: "1.50",
+    terms: "The diamonds herein invoiced have been purchased from a legitimate source...",
   });
+
+  function generateInvoiceNumber() {
+    const currentYear = new Date().getFullYear();
+    const nextYear = currentYear + 1;
+    return `HK-001/${currentYear % 100}-${nextYear % 100}`;
+  }
+
+  function getCurrentDate() {
+    return new Date().toISOString().split("T")[0]; // YYYY-MM-DD format
+  }
 
   const handleChange = (e) => {
     setInvoiceData({ ...invoiceData, [e.target.name]: e.target.value });
   };
 
-  const generateInvoice = () => {
-    const { clientName, service, amount, taxRate, terms, fontSize, alignment } = invoiceData;
-    const taxAmount = (amount * taxRate) / 100;
-    const total = parseFloat(amount) + taxAmount;
-
-    const pdf = new jsPDF();
-    pdf.setFontSize(parseInt(fontSize));
-
-    // Adjust alignment
-    let xPos = alignment === "center" ? 105 : alignment === "right" ? 180 : 20;
-
-    pdf.text("Invoice", xPos, 20, { align: alignment });
-    pdf.text(`Client: ${clientName}`, xPos, 40, { align: alignment });
-    pdf.text(`Service: ${service}`, xPos, 50, { align: alignment });
-    pdf.text(`Amount: $${amount}`, xPos, 60, { align: alignment });
-    pdf.text(`Tax (${taxRate}%): $${taxAmount}`, xPos, 70, { align: alignment });
-    pdf.text(`Total: $${total}`, xPos, 80, { align: alignment });
-    pdf.text(`Terms: ${terms}`, xPos, 100, { align: alignment });
-
-    pdf.save("invoice.pdf");
+  const calculateTotal = () => {
+    const { quantity, rate, cgstRate, sgstRate, igstRate } = invoiceData;
+    const totalAmount = parseFloat(quantity) * parseFloat(rate) || 0;
+    const cgst = (totalAmount * parseFloat(cgstRate)) / 100;
+    const sgst = (totalAmount * parseFloat(sgstRate)) / 100;
+    const igst = (totalAmount * parseFloat(igstRate)) / 100;
+    return {
+      totalAmount,
+      totalWithTax: totalAmount + cgst + sgst + igst,
+      cgst,
+      sgst,
+      igst,
+    };
   };
 
-  return (
-    <div>
-      <h2>Invoice Generator</h2>
-      
-      <label>Client Name:</label>
-      <input name="clientName" placeholder="Client Name" onChange={handleChange} />
+  const generateInvoice = () => {
+    const {
+      invoiceNumber,
+      date,
+      buyerName,
+      buyerAddress,
+      buyerGST,
+      panNumber,
+      lotNumber,
+      hsnCode,
+      quantity,
+      size,
+      rate,
+      terms,
+    } = invoiceData;
 
-      <label>Service:</label>
-      <input name="service" placeholder="Service" onChange={handleChange} />
+    const { totalAmount, totalWithTax, cgst, sgst, igst } = calculateTotal();
 
-      <label>Amount ($):</label>
-      <input name="amount" type="number" placeholder="Amount" onChange={handleChange} />
+    const pdf = new jsPDF();
+    pdf.setFontSize(12);
 
-      <label>Tax Rate (%):</label>
-      <input name="taxRate" type="number" placeholder="Tax Rate" onChange={handleChange} />
+    pdf.text("HK & SONS", 80, 20);
+    pdf.text("INVOICE", 90, 30);
+    pdf.text(`INVOICE NO.: ${invoiceNumber}`, 20, 40);
+    pdf.text(`DATE: ${date}`, 150, 40);
+    pdf.text(`BUYER: ${buyerName}`, 20, 50);
+    pdf.text(`ADDRESS: ${buyerAddress}`, 20, 60);
+    pdf.text(`GSTIN: ${buyerGST}`, 20, 70);
+    pdf.text(`PAN: ${panNumber}`, 20, 80);
 
-      <label>Terms & Conditions:</label>
-      <textarea name="terms" placeholder="Enter terms & conditions" onChange={handleChange} />
+    pdf.text("DESCRIPTION OF GOODS", 20, 100);
+    pdf.text(`LOT NO.: ${lotNumber}`, 20, 110);
+    pdf.text(`HSN CODE: ${hsnCode}`, 60, 110);
+    pdf.text(`SIZE: ${size}`, 110, 110);
+    pdf.text(`QUANTITY: ${quantity}`, 150, 110);
+    pdf.text(`RATE: ₹${rate}`, 20, 120);
+    pdf.text(`AMOUNT: ₹${totalAmount.toFixed(2)}`, 100, 120);
 
-      <label>Font Size:</label>
-      <select name="fontSize" onChange={handleChange}>
-        <option value="12">Small</option>
-        <option value="16" selected>Medium</option>
-        <option value="20">Large</option>
-      </select>
+    pdf.text(`ADD CGST (${invoiceData.cgstRate}%): ₹${cgst.toFixed(2)}`, 20, 140);
+    pdf.text(`ADD SGST (${invoiceData.sgstRate}%): ₹${sgst.toFixed(2)}`, 20, 150);
+    pdf.text(`ADD IGST (${invoiceData.igstRate}%): ₹${igst.toFixed(2)}`, 20, 160);
+    pdf.text(`TOTAL PAYABLE: ₹${totalWithTax.toFixed(2)}`, 20, 170);
 
-      <label>Text Alignment:</label>
-      <select name="alignment" onChange={handleChange}>
-        <option value="left">Left</option>
-        <option value="center">Center</option>
-        <option value="right">Right</option>
-      </select>
+    pdf.text(`AMOUNT IN WORDS: Five Lakh Twenty Seven Thousand Six Hundred Sixty Eight Only`, 20, 190);
+    pdf.text(`TERMS & CONDITIONS:`, 20, 210);
+    pdf.text(terms, 20, 220, { maxWidth: 170 });
 
-      <button onClick={generateInvoice}>Generate Invoice</button>
-    </div>
-  );
-}
+    pdf.text("Partner/Authorized Signatory", 20, 260);
+    pdf.t
